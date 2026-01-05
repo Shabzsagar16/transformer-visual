@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transformer Visualizer - "Attention is All You Need"</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1>🔮 Transformer Visualizer</h1>
+                <p class="subtitle">Understanding "Attention is All You Need" - Step by Step</p>
+                <p class="subtitle-small">Code from <code>model.py</code> linked to each layer</p>
+            </div>
+        </header>
+
+        <!-- Input Section -->
+        <section class="input-section">
+            <div class="input-card">
+                <h2>📝 Enter Your Sentence</h2>
+                <div class="input-wrapper">
+                    <input type="text" id="inputSentence" placeholder="e.g., The cat sat on the mat"
+                        value="The cat sat">
+                    <button id="processBtn" class="btn-primary">
+                        <span>Process Through Transformer</span>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M5 12h14M12 5l7 7-7 7" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="config-panel">
+                    <div class="config-item">
+                        <label>d_model</label>
+                        <span class="config-value">512</span>
+                    </div>
+                    <div class="config-item">
+                        <label>Heads (h)</label>
+                        <span class="config-value">8</span>
+                    </div>
+                    <div class="config-item">
+                        <label>d_k = d_v</label>
+                        <span class="config-value">64</span>
+                    </div>
+                    <div class="config-item">
+                        <label>Layers (N)</label>
+                        <span class="config-value">6</span>
+                    </div>
+                    <div class="config-item">
+                        <label>d_ff</label>
+                        <span class="config-value">2048</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Visualization -->
+        <main class="visualization-container" id="visualizationContainer">
+            <!-- Phase 1: Tokenization -->
+            <section class="phase-card" id="phase1">
+                <div class="phase-header">
+                    <div class="phase-number">1</div>
+                    <div class="phase-info">
+                        <h3>Tokenization</h3>
+                        <p>Convert text to token IDs</p>
+                    </div>
+                    <div class="code-ref-badge" onclick="toggleCode('code-tokenize')">
+                        <span class="code-icon">📄</span>
+                        <span>dataset.py</span>
+                    </div>
+                </div>
+
+                <!-- Code Reference Panel -->
+                <div class="code-panel" id="code-tokenize">
+                    <div class="code-panel-header">
+                        <span class="code-class-name">BilingualDataset.__getitem__</span>
+                        <span class="code-file">dataset.py:45-70</span>
+                    </div>
+                    <pre class="code-snippet"><code># Tokenize source and target sentences
+enc_input_tokens = self.tokenizer_src.encode(src_text).ids
+dec_input_tokens = self.tokenizer_tgt.encode(tgt_text).ids
+
+# Add special tokens: [SOS], [EOS], [PAD]
+encoder_input = torch.cat([
+    self.sos_token,
+    torch.tensor(enc_input_tokens, dtype=torch.int64),
+    self.eos_token,
+    torch.tensor([self.pad_token] * enc_padding_len)
+])</code></pre>
+                </div>
+
+                <div class="phase-content">
+                    <div class="shape-flow">
+                        <div class="shape-step">
+                            <div class="step-label">Input Text</div>
+                            <div class="data-box text-box" id="inputText"></div>
+                            <div class="shape-badge input-shape">string</div>
+                        </div>
+                        <div class="arrow-down">↓ <span class="transform-label">Tokenizer</span></div>
+                        <div class="shape-step">
+                            <div class="step-label">Tokens</div>
+                            <div class="data-box tokens-box" id="tokens"></div>
+                            <div class="shape-badge" id="tokensShape"></div>
+                        </div>
+                        <div class="arrow-down">↓ <span class="transform-label">Vocab Lookup</span></div>
+                        <div class="shape-step">
+                            <div class="step-label">Token IDs</div>
+                            <div class="data-box ids-box" id="tokenIds"></div>
+                            <div class="shape-badge output-shape" id="tokenShape"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Phase 2: Embedding -->
+            <section class="phase-card" id="phase2">
+                <div class="phase-header">
+                    <div class="phase-number">2</div>
+                    <div class="phase-info">
+                        <h3>Input Embedding</h3>
+                        <p>Token IDs → Dense Vectors</p>
+                    </div>
+                    <div class="code-ref-badge" onclick="toggleCode('code-embed')">
+                        <span class="code-icon">🐍</span>
+                        <span>InputEmbeddings</span>
+                    </div>
+                </div>
+
+                <!-- Code Reference Panel -->
+                <div class="code-panel" id="code-embed">
+                    <div class="code-panel-header">
+                        <span class="code-class-name">class InputEmbeddings(nn.Module)</span>
+                        <span class="code-file">model.py:73-99</span>
+                    </div>
+                    <pre class="code-snippet"><code>class InputEmbeddings(nn.Module):
+    """Section 3.4: Learned Embeddings"""
+    
+    def __init__(self, d_model: int, vocab_size: int):
+        super().__init__()
+        self.d_model = d_model
+        self.embedding = nn.Embedding(vocab_size, d_model)
+
+    def forward(self, x):
+        # Scale by sqrt(d_model) as per paper Section 3.4
+        return self.embedding(x) * math.sqrt(self.d_model)</code></pre>
+                </div>
+
+                <div class="phase-content">
+                    <div class="formula-box">
+                        <div class="formula-title">📐 Formula (Section 3.4)</div>
+                        <code class="formula-large">output = Embedding(token_ids) × √d_model</code>
+                        <div class="formula-explanation">Scaling by √512 ≈ 22.6 maintains variance for training
+                            stability</div>
+                    </div>
+
+                    <div class="shape-transformation">
+                        <div class="shape-io">
+                            <span class="shape-label">Input:</span>
+                            <span class="shape-badge input-shape" id="embInputShape">(seq_len,)</span>
+                        </div>
+                        <div class="shape-arrow">→</div>
+                        <div class="shape-io">
+                            <span class="shape-label">Output:</span>
+                            <span class="shape-badge output-shape" id="embOutputShape">(seq_len, 512)</span>
+                        </div>
+                    </div>
+
+                    <div class="matrix-container">
+                        <div class="matrix-label">Embedding Matrix (showing first 8 of 512 dimensions)</div>
+                        <div class="matrix-visual" id="embeddingMatrix"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Phase 3: Positional Encoding -->
+            <section class="phase-card" id="phase3">
+                <div class="phase-header">
+                    <div class="phase-number">3</div>
+                    <div class="phase-info">
+                        <h3>Positional Encoding</h3>
+                        <p>Add position information</p>
+                    </div>
+                    <div class="code-ref-badge" onclick="toggleCode('code-pe')">
+                        <span class="code-icon">🐍</span>
+                        <span>PositionalEncoding</span>
+                    </div>
+                </div>
+
+                <!-- Code Reference Panel -->
+                <div class="code-panel" id="code-pe">
+                    <div class="code-panel-header">
+                        <span class="code-class-name">class PositionalEncoding(nn.Module)</span>
+                        <span class="code-file">model.py:101-169</span>
+                    </div>
+                    <pre class="code-snippet"><code>class PositionalEncoding(nn.Module):
+    """Section 3.5: Positional Encoding using sinusoids"""
+    
+    def __init__(self, d_model: int, seq_len: int, dropout: float):
+        super().__init__()
+        pe = torch.zeros(seq_len, d_model)
+        position = torch.arange(0, seq_len).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2) * 
+                            (-math.log(10000.0) / d_model))
+        
+        pe[:, 0::2] = torch.sin(position * div_term)  # Even dims
+        pe[:, 1::2] = torch.cos(position * div_term)  # Odd dims
+        self.register_buffer('pe', pe.unsqueeze(0))
+
+    def forward(self, x):
+        x = x + self.pe[:, :x.shape[1], :]
+        return self.dropout(x)</code></pre>
+                </div>
+
+                <div class="phase-content">
+                    <div class="formula-box">
+                        <div class="formula-title">📐 Formulas (Section 3.5)</div>
+                        <div class="formula-grid">
+                            <code class="formula-large">PE(pos, 2i) = sin(pos / 10000^(2i/d_model))</code>
+                            <code class="formula-large">PE(pos, 2i+1) = cos(pos / 10000^(2i/d_model))</code>
+                        </div>
+                    </div>
+
+                    <div class="shape-transformation">
+                        <div class="shape-io">
+                            <span class="shape-label">Embeddings:</span>
+                            <span class="shape-badge input-shape" id="peInputShape1">(seq_len, 512)</span>
+                        </div>
+                        <div class="shape-operator">+</div>
+                        <div class="shape-io">
+                            <span class="shape-label">PE:</span>
+                            <span class="shape-badge pe-shape" id="peInputShape2">(seq_len, 512)</span>
+                        </div>
+                        <div class="shape-arrow">=</div>
+                        <div class="shape-io">
+                            <span class="shape-label">Output:</span>
+                            <span class="shape-badge output-shape" id="peOutputShape">(seq_len, 512)</span>
+                        </div>
+                    </div>
+
+                    <div class="pe-visual">
+                        <div class="matrix-container">
+                            <div class="matrix-label">Embeddings</div>
+                            <div class="matrix-visual small" id="embInput"></div>
+                        </div>
+                        <div class="operator">+</div>
+                        <div class="matrix-container">
+                            <div class="matrix-label">Positional Encoding</div>
+                            <div class="matrix-visual small pe-colors" id="peMatrix"></div>
+                        </div>
+                        <div class="operator">=</div>
+                        <div class="matrix-container">
+                            <div class="matrix-label">Combined</div>
+                            <div class="matrix-visual small" id="embPlusPos"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Phase 4: Encoder -->
+            <section class="phase-card encoder-phase" id="phase4">
+                <div class="phase-header">
+                    <div class="phase-number encoder-num">4</div>
+                    <div class="phase-info">
+                        <h3>Encoder (×6 layers)</h3>
+                        <p>Self-Attention + Feed-Forward</p>
+                    </div>
+                    <div class="code-ref-badge" onclick="toggleCode('code-encoder')">
+                        <span class="code-icon">🐍</span>
+                        <span>Encoder / EncoderBlock</span>
+                    </div>
+                </div>
+
+                <!-- Code Reference Panel -->
+                <div class="code-panel" id="code-encoder">
+                    <div class="code-panel-header">
+                        <span class="code-class-name">class Encoder + EncoderBlock</span>
+                        <span class="code-file">model.py:341-402</span>
+                    </div>
+                    <pre class="code-snippet"><code>class EncoderBlock(nn.Module):
+    """Section 3.1: Each encoder block has 2 sub-layers"""
+    
+    def __init__(self, self_attention_block, feed_forward_block, ...):
+        self.self_attention_block = self_attention_block
+        self.feed_forward_block = feed_forward_block
+        self.residual_connections = nn.ModuleList([
+            ResidualConnection(features, dropout) for _ in range(2)
+        ])
+
+    def forward(self, x, src_mask):
+        # Sub-layer 1: Self-Attention + Residual
+        x = self.residual_connections[0](x, 
+            lambda x: self.self_attention_block(x, x, x, src_mask))
+        # Sub-layer 2: FFN + Residual
+        x = self.residual_connections[1](x, self.feed_forward_block)
+        return x
+
+class Encoder(nn.Module):
+    """Stack of N=6 identical encoder blocks"""
+    def forward(self, x, mask):
+        for layer in self.layers:
+            x = layer(x, mask)
+        return self.norm(x)</code></pre>
+                </div>
+
+                <div class="phase-content">
+                    <div class="encoder-block">
+                        <div class="block-title">Encoder Block (layer 1 of 6)</div>
+
+                        <!-- Self-Attention -->
+                        <div class="sub-layer">
+                            <div class="sub-layer-header">
+                                <span class="sub-layer-name">Multi-Head Self-Attention</span>
+                                <div class="code-ref-badge small" onclick="toggleCode('code-mha')">
+                                    <span class="code-icon">🐍</span>
+                                    <span>MultiHeadAttentionBlock</span>
+                                </div>
+                            </div>
+
+                            <!-- Code Reference Panel -->
+                            <div class="code-panel" id="code-mha">
+                                <div class="code-panel-header">
+                                    <span class="code-class-name">class MultiHeadAttentionBlock</span>
+                                    <span class="code-file">model.py:202-339</span>
+                                </div>
+                                <pre class="code-snippet"><code>class MultiHeadAttentionBlock(nn.Module):
+    """Section 3.2: Multi-Head Attention"""
+    
+    def __init__(self, d_model: int, h: int, dropout: float):
+        self.d_k = d_model // h  # 512/8 = 64
+        self.w_q = nn.Linear(d_model, d_model)  # W^Q
+        self.w_k = nn.Linear(d_model, d_model)  # W^K
+        self.w_v = nn.Linear(d_model, d_model)  # W^V
+        self.w_o = nn.Linear(d_model, d_model)  # W^O
+
+    @staticmethod
+    def attention(query, key, value, mask, dropout):
+        d_k = query.shape[-1]
+        # Equation 1: Attention(Q,K,V) = softmax(QK^T/√d_k)V
+        scores = (query @ key.transpose(-2, -1)) / math.sqrt(d_k)
+        if mask is not None:
+            scores.masked_fill_(mask == 0, -1e9)
+        attention_weights = scores.softmax(dim=-1)
+        return (attention_weights @ value), attention_weights
+
+    def forward(self, q, k, v, mask):
+        # Project Q, K, V
+        query = self.w_q(q)  # (batch, seq, d_model)
+        key = self.w_k(k)
+        value = self.w_v(v)
+        # Split into heads: (batch, seq, h, d_k) → (batch, h, seq, d_k)
+        # Apply attention, concatenate, project with W^O
+        return self.w_o(x)</code></pre>
+                            </div>
+
+                            <div class="formula-box compact">
+                                <div class="formula-title">📐 Scaled Dot-Product Attention (Equation 1)</div>
+                                <code
+                                    class="formula-large">Attention(Q, K, V) = softmax(QK<sup>T</sup> / √d_k) × V</code>
+                            </div>
+
+                            <div class="shape-transformation">
+                                <div class="shape-io">
+                                    <span class="shape-label">Input X:</span>
+                                    <span class="shape-badge input-shape" id="attnInputShape">(seq_len, 512)</span>
+                                </div>
+                            </div>
+
+                            <div class="attention-flow">
+                                <div class="qkv-container">
+                                    <div class="qkv-item q">
+                                        <div class="qkv-label">Q = X·W<sup>Q</sup></div>
+                                        <div class="qkv-matrix" id="queryMatrix"></div>
+                                        <div class="shape-badge q-shape" id="qShape">(seq, 8, 64)</div>
+                                    </div>
+                                    <div class="qkv-item k">
+                                        <div class="qkv-label">K = X·W<sup>K</sup></div>
+                                        <div class="qkv-matrix" id="keyMatrix"></div>
+                                        <div class="shape-badge k-shape" id="kShape">(seq, 8, 64)</div>
+                                    </div>
+                                    <div class="qkv-item v">
+                                        <div class="qkv-label">V = X·W<sup>V</sup></div>
+                                        <div class="qkv-matrix" id="valueMatrix"></div>
+                                        <div class="shape-badge v-shape" id="vShape">(seq, 8, 64)</div>
+                                    </div>
+                                </div>
+
+                                <div class="computation-step">
+                                    <div class="arrow-down">↓</div>
+                                    <code class="formula-inline">scores = QK<sup>T</sup> / √64</code>
+                                </div>
+
+                                <div class="attention-scores-container">
+                                    <div class="scores-label">Attention Scores (Head 1 of 8)</div>
+                                    <div class="shape-badge scores-shape" id="scoresShape">(seq, seq)</div>
+                                    <div class="attention-heatmap" id="attentionHeatmap"></div>
+                                    <div class="heatmap-legend">
+                                        <span class="legend-low">Low</span>
+                                        <div class="legend-gradient"></div>
+                                        <span class="legend-high">High</span>
+                                    </div>
+                                </div>
+
+                                <div class="computation-step">
+                                    <code class="formula-inline">output = softmax(scores) × V</code>
+                                    <div class="arrow-down">↓</div>
+                                </div>
+
+                                <div class="shape-transformation">
+                                    <div class="shape-io">
+                                        <span class="shape-label">Concat Heads:</span>
+                                        <span class="shape-badge" id="concatShape">(seq, 512)</span>
+                                    </div>
+                                    <div class="shape-arrow">→ W<sup>O</sup> →</div>
+                                    <div class="shape-io">
+                                        <span class="shape-label">Output:</span>
+                                        <span class="shape-badge output-shape" id="attnOutputShape">(seq, 512)</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="residual-indicator">
+                                <div class="code-ref-inline">
+                                    <span class="code-icon">🐍</span>
+                                    <span>ResidualConnection + LayerNormalization</span>
+                                </div>
+                                <code class="formula-inline">LayerNorm(X + Attention(X))</code>
+                            </div>
+                        </div>
+
+                        <!-- Feed-Forward -->
+                        <div class="sub-layer ffn">
+                            <div class="sub-layer-header">
+                                <span class="sub-layer-name">Position-wise Feed-Forward Network</span>
+                                <div class="code-ref-badge small" onclick="toggleCode('code-ffn')">
+                                    <span class="code-icon">🐍</span>
+                                    <span>FeedForwardBlock</span>
+                                </div>
+                            </div>
+
+                            <!-- Code Reference Panel -->
+                            <div class="code-panel" id="code-ffn">
+                                <div class="code-panel-header">
+                                    <span class="code-class-name">class FeedForwardBlock</span>
+                                    <span class="code-file">model.py:44-71</span>
+                                </div>
+                                <pre class="code-snippet"><code>class FeedForwardBlock(nn.Module):
+    """Section 3.3: Position-wise Feed-Forward Networks
+    
+    FFN(x) = max(0, xW₁ + b₁)W₂ + b₂
+    """
+    def __init__(self, d_model: int, d_ff: int, dropout: float):
+        super().__init__()
+        self.linear_1 = nn.Linear(d_model, d_ff)   # W₁: 512 → 2048
+        self.dropout = nn.Dropout(dropout)
+        self.linear_2 = nn.Linear(d_ff, d_model)   # W₂: 2048 → 512
+
+    def forward(self, x):
+        # (batch, seq_len, 512) → (batch, seq_len, 2048) → (batch, seq_len, 512)
+        return self.linear_2(self.dropout(torch.relu(self.linear_1(x))))</code></pre>
+                            </div>
+
+                            <div class="formula-box compact">
+                                <div class="formula-title">📐 FFN (Section 3.3)</div>
+                                <code class="formula-large">FFN(x) = max(0, xW₁ + b₁)W₂ + b₂</code>
+                            </div>
+
+                            <div class="ffn-visual">
+                                <div class="ffn-step">
+                                    <div class="ffn-layer">
+                                        <span class="ffn-dim">512</span>
+                                    </div>
+                                    <div class="shape-badge input-shape">(seq, 512)</div>
+                                </div>
+                                <div class="ffn-arrow-container">
+                                    <div class="ffn-arrow">→</div>
+                                    <div class="ffn-transform">linear_1</div>
+                                </div>
+                                <div class="ffn-step">
+                                    <div class="ffn-layer expand">
+                                        <span class="ffn-dim">2048</span>
+                                        <div class="relu-label">ReLU</div>
+                                    </div>
+                                    <div class="shape-badge expand-shape">(seq, 2048)</div>
+                                </div>
+                                <div class="ffn-arrow-container">
+                                    <div class="ffn-arrow">→</div>
+                                    <div class="ffn-transform">linear_2</div>
+                                </div>
+                                <div class="ffn-step">
+                                    <div class="ffn-layer">
+                                        <span class="ffn-dim">512</span>
+                                    </div>
+                                    <div class="shape-badge output-shape">(seq, 512)</div>
+                                </div>
+                            </div>
+
+                            <div class="residual-indicator">
+                                <code class="formula-inline">LayerNorm(X + FFN(X))</code>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="encoder-output">
+                        <div class="matrix-label">Encoder Output (after 6 layers)</div>
+                        <div class="matrix-visual" id="encoderOutput"></div>
+                        <div class="shape-badge output-shape" id="encoderOutputShape">(seq_len, 512)</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Phase 5: Decoder -->
+            <section class="phase-card decoder-phase" id="phase5">
+                <div class="phase-header">
+                    <div class="phase-number decoder-num">5</div>
+                    <div class="phase-info">
+                        <h3>Decoder (×6 layers)</h3>
+                        <p>Masked Self-Attn + Cross-Attn + FFN</p>
+                    </div>
+                    <div class="code-ref-badge" onclick="toggleCode('code-decoder')">
+                        <span class="code-icon">🐍</span>
+                        <span>Decoder / DecoderBlock</span>
+                    </div>
+                </div>
+
+                <!-- Code Reference Panel -->
+                <div class="code-panel" id="code-decoder">
+                    <div class="code-panel-header">
+                        <span class="code-class-name">class Decoder + DecoderBlock</span>
+                        <span class="code-file">model.py:404-478</span>
+                    </div>
+                    <pre class="code-snippet"><code>class DecoderBlock(nn.Module):
+    """Section 3.1: Each decoder block has 3 sub-layers"""
+    
+    def __init__(self, self_attention, cross_attention, feed_forward, ...):
+        self.self_attention_block = self_attention    # Masked
+        self.cross_attention_block = cross_attention  # Encoder-Decoder
+        self.feed_forward_block = feed_forward
+        self.residual_connections = nn.ModuleList([
+            ResidualConnection(features, dropout) for _ in range(3)
+        ])
+
+    def forward(self, x, encoder_output, src_mask, tgt_mask):
+        # Sub-layer 1: Masked Self-Attention
+        x = self.residual_connections[0](x,
+            lambda x: self.self_attention_block(x, x, x, tgt_mask))
+        # Sub-layer 2: Cross-Attention (Q=decoder, K,V=encoder)
+        x = self.residual_connections[1](x,
+            lambda x: self.cross_attention_block(x, encoder_output, 
+                                                  encoder_output, src_mask))
+        # Sub-layer 3: FFN
+        x = self.residual_connections[2](x, self.feed_forward_block)
+        return x</code></pre>
+                </div>
+
+                <div class="phase-content">
+                    <div class="decoder-block">
+                        <div class="block-title">Decoder Block (layer 1 of 6)</div>
+
+                        <!-- Masked Self-Attention -->
+                        <div class="sub-layer masked">
+                            <div class="sub-layer-header">
+                                <span class="sub-layer-name">Masked Multi-Head Self-Attention</span>
+                                <span class="mask-indicator">🎭 Causal Mask</span>
+                            </div>
+
+                            <div class="formula-box compact">
+                                <div class="formula-title">📐 Masked Attention</div>
+                                <code
+                                    class="formula-large">Attention(Q, K, V, mask) = softmax(QK<sup>T</sup>/√d_k + mask) × V</code>
+                                <div class="formula-explanation">mask[i,j] = -∞ where j > i (future positions)</div>
+                            </div>
+
+                            <div class="shape-transformation">
+                                <div class="shape-io">
+                                    <span class="shape-label">Target Input:</span>
+                                    <span class="shape-badge input-shape" id="decInputShape">(tgt_len, 512)</span>
+                                </div>
+                                <div class="shape-arrow">→</div>
+                                <div class="shape-io">
+                                    <span class="shape-label">Output:</span>
+                                    <span class="shape-badge output-shape">(tgt_len, 512)</span>
+                                </div>
+                            </div>
+
+                            <div class="causal-mask-visual">
+                                <div class="mask-explanation">Each position can only attend to earlier positions:</div>
+                                <div class="mask-matrix" id="causalMask"></div>
+                                <div class="shape-badge mask-shape" id="maskShape">(tgt_len, tgt_len)</div>
+                            </div>
+                        </div>
+
+                        <!-- Cross-Attention -->
+                        <div class="sub-layer cross-attention">
+                            <div class="sub-layer-header">
+                                <span class="sub-layer-name">Cross-Attention (Encoder-Decoder)</span>
+                                <span class="cross-indicator">🔗 Encoder → Decoder</span>
+                            </div>
+
+                            <div class="formula-box compact">
+                                <div class="formula-title">📐 Cross-Attention</div>
+                                <code class="formula-large">Attention(Q_dec, K_enc, V_enc)</code>
+                                <div class="formula-explanation">Q from decoder, K & V from encoder output</div>
+                            </div>
+
+                            <div class="shape-transformation">
+                                <div class="shape-io">
+                                    <span class="shape-label">Q (Decoder):</span>
+                                    <span class="shape-badge decoder-shape" id="crossQShape">(tgt_len, 512)</span>
+                                </div>
+                                <div class="shape-operator">×</div>
+                                <div class="shape-io">
+                                    <span class="shape-label">K, V (Encoder):</span>
+                                    <span class="shape-badge encoder-shape" id="crossKVShape">(src_len, 512)</span>
+                                </div>
+                                <div class="shape-arrow">→</div>
+                                <div class="shape-io">
+                                    <span class="shape-label">Scores:</span>
+                                    <span class="shape-badge scores-shape" id="crossScoresShape">(tgt_len,
+                                        src_len)</span>
+                                </div>
+                            </div>
+
+                            <div class="cross-attention-visual">
+                                <div class="cross-source">
+                                    <div class="cross-label">Decoder Query</div>
+                                    <div class="cross-box decoder-box" id="decoderQuery"></div>
+                                </div>
+                                <div class="cross-arrow">attends to</div>
+                                <div class="cross-source">
+                                    <div class="cross-label">Encoder K/V</div>
+                                    <div class="cross-box encoder-box" id="encoderKV"></div>
+                                </div>
+                            </div>
+
+                            <div class="cross-heatmap-container">
+                                <div class="scores-label">Cross-Attention Scores</div>
+                                <div class="attention-heatmap cross" id="crossAttentionHeatmap"></div>
+                            </div>
+                        </div>
+
+                        <!-- FFN -->
+                        <div class="sub-layer ffn">
+                            <div class="sub-layer-header">
+                                <span class="sub-layer-name">Feed-Forward Network</span>
+                            </div>
+                            <div class="shape-transformation compact">
+                                <span class="shape-badge input-shape">(tgt, 512)</span>
+                                <span class="shape-arrow">→ FFN →</span>
+                                <span class="shape-badge output-shape">(tgt, 512)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Phase 6: Output -->
+            <section class="phase-card output-phase" id="phase6">
+                <div class="phase-header">
+                    <div class="phase-number output-num">6</div>
+                    <div class="phase-info">
+                        <h3>Output Projection</h3>
+                        <p>Linear → Softmax → Token</p>
+                    </div>
+                    <div class="code-ref-badge" onclick="toggleCode('code-proj')">
+                        <span class="code-icon">🐍</span>
+                        <span>ProjectionLayer</span>
+                    </div>
+                </div>
+
+                <!-- Code Reference Panel -->
+                <div class="code-panel" id="code-proj">
+                    <div class="code-panel-header">
+                        <span class="code-class-name">class ProjectionLayer</span>
+                        <span class="code-file">model.py:480-502</span>
+                    </div>
+                    <pre class="code-snippet"><code>class ProjectionLayer(nn.Module):
+    """Projects decoder output to vocabulary logits"""
+    
+    def __init__(self, d_model, vocab_size):
+        super().__init__()
+        self.proj = nn.Linear(d_model, vocab_size)
+
+    def forward(self, x):
+        # (batch, seq_len, d_model) → (batch, seq_len, vocab_size)
+        return self.proj(x)
+        
+# During inference:
+# logits = projection_layer(decoder_output)
+# probs = F.softmax(logits, dim=-1)
+# next_token = probs.argmax(dim=-1)</code></pre>
+                </div>
+
+                <div class="phase-content">
+                    <div class="formula-box">
+                        <div class="formula-title">📐 Output Layer</div>
+                        <code class="formula-large">P(next_token) = softmax(decoder_output × W_vocab)</code>
+                    </div>
+
+                    <div class="output-flow">
+                        <div class="output-step">
+                            <div class="output-label">Decoder Output</div>
+                            <div class="output-box" id="decOutShape">(tgt_len, 512)</div>
+                        </div>
+                        <div class="output-arrow">
+                            <div class="arrow-right">→</div>
+                            <div class="output-transform">proj.linear<br><span class="dim-info">(512 × vocab)</span>
+                            </div>
+                        </div>
+                        <div class="output-step">
+                            <div class="output-label">Logits</div>
+                            <div class="output-box projection" id="logitsShape">(tgt_len, vocab)</div>
+                        </div>
+                        <div class="output-arrow">
+                            <div class="arrow-right">→</div>
+                            <div class="output-transform">softmax</div>
+                        </div>
+                        <div class="output-step">
+                            <div class="output-label">Probabilities</div>
+                            <div class="output-box softmax" id="probsShape">(tgt_len, vocab)</div>
+                        </div>
+                        <div class="output-arrow">
+                            <div class="arrow-right">→</div>
+                            <div class="output-transform">argmax</div>
+                        </div>
+                        <div class="output-step final">
+                            <div class="output-label">Predicted</div>
+                            <div class="output-box prediction" id="predictedToken"></div>
+                        </div>
+                    </div>
+
+                    <div class="probability-dist">
+                        <div class="prob-label">Token Probability Distribution (top 5)</div>
+                        <div class="prob-bars" id="probBars"></div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Code Classes Summary -->
+        <aside class="code-summary-panel">
+            <h4>📦 model.py Classes</h4>
+            <div class="code-class-list">
+                <div class="code-class-item" onclick="scrollToPhase('phase2')">
+                    <span class="class-name">InputEmbeddings</span>
+                    <span class="class-line">:73</span>
+                </div>
+                <div class="code-class-item" onclick="scrollToPhase('phase3')">
+                    <span class="class-name">PositionalEncoding</span>
+                    <span class="class-line">:101</span>
+                </div>
+                <div class="code-class-item" onclick="scrollToPhase('phase4')">
+                    <span class="class-name">MultiHeadAttentionBlock</span>
+                    <span class="class-line">:202</span>
+                </div>
+                <div class="code-class-item" onclick="scrollToPhase('phase4')">
+                    <span class="class-name">FeedForwardBlock</span>
+                    <span class="class-line">:44</span>
+                </div>
+                <div class="code-class-item">
+                    <span class="class-name">LayerNormalization</span>
+                    <span class="class-line">:9</span>
+                </div>
+                <div class="code-class-item">
+                    <span class="class-name">ResidualConnection</span>
+                    <span class="class-line">:171</span>
+                </div>
+                <div class="code-class-item" onclick="scrollToPhase('phase4')">
+                    <span class="class-name">EncoderBlock</span>
+                    <span class="class-line">:341</span>
+                </div>
+                <div class="code-class-item" onclick="scrollToPhase('phase5')">
+                    <span class="class-name">DecoderBlock</span>
+                    <span class="class-line">:404</span>
+                </div>
+                <div class="code-class-item" onclick="scrollToPhase('phase6')">
+                    <span class="class-name">ProjectionLayer</span>
+                    <span class="class-line">:480</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Based on "Attention is All You Need" (Vaswani et al., 2017) |
+                <a href="https://arxiv.org/abs/1706.03762" target="_blank">Paper</a>
+            </p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
