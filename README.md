@@ -126,8 +126,20 @@ Vaswani et al., 2017
 
 ## Credits
 
-- Original PyTorch implementation: [hkproj/pytorch-transformer](https://github.com/hkproj/pytorch-transformer)
-- Visualization and documentation enhancements: This repository
+This project builds upon the excellent work of:
+
+**Original Implementation:**
+- **Author:** [Umar Jamil (hkproj)](https://github.com/hkproj)
+- **Repository:** [pytorch-transformer](https://github.com/hkproj/pytorch-transformer)
+- **YouTube Tutorial:** [Coding a Transformer from scratch](https://www.youtube.com/watch?v=ISNdQcPhsts)
+
+**Enhancements in this repository:**
+- Comprehensive code documentation with paper references
+- Interactive web-based visualization UI
+- Shape tracking and formula explanations
+- Code-to-UI mapping with expandable panels
+
+Special thanks to Umar Jamil for the clear and well-structured original implementation that made this educational visualization possible.
 
 ## License
 
